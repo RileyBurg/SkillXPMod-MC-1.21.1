@@ -15,6 +15,7 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
@@ -30,7 +31,7 @@ import java.util.*;
 public class SkillXPMod implements ModInitializer {
 	public static final String MOD_ID = "skillxpmod"; // Duh, our mod ID is pure gold!
 	private static final Map<Block, Integer> MINING_XP_VALUES = new HashMap<>();
-	private static final Map<Item, Integer> COOKING_XP_VALUES = new HashMap<>();
+	public static final Map<Item, Integer> COOKING_XP_VALUES = new HashMap<>();
 	private static final Map<EntityType<?>, Integer> COMBAT_HIT_XP_VALUES = new HashMap<>();
 	private static final Map<EntityType<?>, Integer> COMBAT_KILL_XP_VALUES = new HashMap<>();
 	private static final Set<Block> LOG_BLOCKS = Set.of(
@@ -156,29 +157,6 @@ public class SkillXPMod implements ModInitializer {
 			}
 		});
 
-		// Register cooking event for furnaces, smokers, and blast furnaces, because it’s super easy to cook in those!
-		UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-			if (!world.isClient && player instanceof ServerPlayerEntity serverPlayer) {
-				Block block = world.getBlockState(hitResult.getBlockPos()).getBlock();
-				if (COOKING_BLOCKS.contains(block)) {
-					AbstractFurnaceBlockEntity furnace = (AbstractFurnaceBlockEntity) world.getBlockEntity(hitResult.getBlockPos());
-					if (furnace != null && !furnace.getStack(2).isEmpty()) {
-						Item item = furnace.getStack(2).getItem();
-						if (COOKING_XP_VALUES.containsKey(item)) {
-							int xpToAward = COOKING_XP_VALUES.get(item);
-							SkillData.addSkillXP(serverPlayer, "cooking", xpToAward);
-							int xp = SkillData.getSkillXP(serverPlayer, "cooking");
-							int level = SkillData.getSkillLevel(serverPlayer, "cooking");
-							int xpForNextLevel = calculateXPForNextLevel(level);
-							serverPlayer.sendMessage(Text.literal("Cooking XP: " + xp + "/" + xpForNextLevel + " (+" + xpToAward + " from " + item.getName().getString() + ")"), true);
-							checkLevelUp(serverPlayer, "cooking");
-						}
-					}
-				}
-			}
-			return ActionResult.PASS;
-		});
-
 		// Register combat hit event, tiny XP for just swinging, definitely will work this time!
 		AttackEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
 			if (!world.isClient && player instanceof ServerPlayerEntity serverPlayer && entity instanceof LivingEntity livingEntity && livingEntity.isAlive()) {
@@ -216,7 +194,7 @@ public class SkillXPMod implements ModInitializer {
 	}
 
 	// Super easy XP calculation, because we’re obviously math wizards!
-	private int calculateXPForNextLevel(int currentLevel) {
+	public static int calculateXPForNextLevel(int currentLevel) {
 		if (currentLevel == 0) {
 			return 100;
 		}
@@ -228,7 +206,7 @@ public class SkillXPMod implements ModInitializer {
 	}
 
 	// Check for level-ups, because we’re obviously making players feel like total rockstars!
-	private void checkLevelUp(ServerPlayerEntity player, String skill) {
+	public static void checkLevelUp(ServerPlayerEntity player, String skill) {
 		int xp = SkillData.getSkillXP(player, skill);
 		int level = SkillData.getSkillLevel(player, skill);
 		int xpForNextLevel = calculateXPForNextLevel(level);

@@ -14,7 +14,9 @@
 	"entrypoints": {
 		"main": ["com.bear.skillxpmod.SkillXPMod"]
 	},
-	"mixins": ["skillxpmod.mixins.json"],
+	"mixins": [
+		"skillxpmod.mixins.json"
+	],
 	"depends": {
 		"fabricloader": ">=0.16.5",
 		"fabric": "*",
