@@ -2,6 +2,7 @@ package com.bear.skillxpmod.mixin;
 
 import com.bear.skillxpmod.SkillData;
 import com.bear.skillxpmod.SkillXPMod;
+import com.bear.skillxpmod.SkillValues;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -21,36 +22,40 @@ public abstract class FurnaceOutputMixin {
     @Unique
     private PlayerEntity cachedPlayer = null;
 
-    // Called on normal take (click-and-drag)
     @Inject(method = "onTakeItem", at = @At("HEAD"))
-    private void cachePlayer(PlayerEntity player, ItemStack stack, CallbackInfo ci) {
+    private void onTakeItem(PlayerEntity player, ItemStack stack, CallbackInfo ci) {
         this.cachedPlayer = player;
-        awardCookingXP(player, stack);
+
+        if (!player.getWorld().isClient && player instanceof ServerPlayerEntity serverPlayer) {
+            int amount = stack.getCount();
+            Item item = stack.getItem();
+
+            awardCookingXP(serverPlayer, item, amount);
+            awardSmeltingXP(serverPlayer, item, amount);
+        }
     }
 
-    // Called when shift-clicking
-    @Inject(method = "takeStack", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "takeStack", at = @At("RETURN"))
     private void onShiftClickTakeStack(int amount, CallbackInfoReturnable<ItemStack> cir) {
-        if (this.cachedPlayer != null) return; // Already handled in onTakeItem
+        if (cachedPlayer == null || cachedPlayer.getWorld().isClient || !(cachedPlayer instanceof ServerPlayerEntity serverPlayer)) return;
 
         ItemStack stack = cir.getReturnValue();
         if (!stack.isEmpty()) {
-            awardCookingXP(this.cachedPlayer, stack);
+            Item item = stack.getItem();
+            int count = stack.getCount();
+
+            awardCookingXP(serverPlayer, item, count);
+            awardSmeltingXP(serverPlayer, item, count);
         }
     }
 
     @Unique
-    private void awardCookingXP(PlayerEntity player, ItemStack stack) {
-        if (player == null || player.getWorld().isClient) return;
-
-        Item item = stack.getItem();
-        int amount = stack.getCount();
-
-        if (SkillXPMod.COOKING_XP_VALUES.containsKey(item)) {
-            int xpPerItem = SkillXPMod.COOKING_XP_VALUES.get(item);
+    private void awardCookingXP(ServerPlayerEntity player, Item item, int amount) {
+        Integer xpPerItem = SkillValues.COOKING_XP_VALUES.get(item);
+        if (xpPerItem != null) {
             int totalXP = xpPerItem * amount;
+            SkillData.addSkillXP(player, "cooking", totalXP);
 
-            SkillData.addSkillXP((ServerPlayerEntity) player, "cooking", totalXP);
             int xp = SkillData.getSkillXP(player, "cooking");
             int level = SkillData.getSkillLevel(player, "cooking");
             int xpForNextLevel = SkillXPMod.calculateXPForNextLevel(level);
@@ -58,7 +63,18 @@ public abstract class FurnaceOutputMixin {
             player.sendMessage(Text.literal("Cooking XP: " + xp + "/" + xpForNextLevel +
                     " (+" + totalXP + " from " + amount + "x " + item.getName().getString() + ")"), true);
 
-            SkillXPMod.checkLevelUp((ServerPlayerEntity) player, "cooking");
+            SkillXPMod.checkLevelUp(player, "cooking");
+        }
+    }
+
+    @Unique
+    private void awardSmeltingXP(ServerPlayerEntity player, Item item, int amount) {
+        Integer xpPerItem = SkillValues.SMITHING_XP_VALUES.get(item);
+        if (xpPerItem != null) {
+            int totalXP = xpPerItem * amount;
+            SkillData.addSkillXP(player, "smithing", totalXP);
+            SkillXPMod.sendXPMessage(player, "smithing", totalXP, item.getName().getString());
+            SkillXPMod.checkLevelUp(player, "smithing");
         }
     }
 }
